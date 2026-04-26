@@ -35,7 +35,7 @@ html,body{
 
 #fileInput{
     position:absolute;
-    top:100px;
+    top:120px;
     left:10px;
     z-index:1000;
 
@@ -89,26 +89,37 @@ const redIcon = new L.Icon({
 
 });
 
-// GPS現在地
-navigator.geolocation.getCurrentPosition(
+// 現在地マーカー
+let currentMarker = null;
+
+// GPS監視開始
+navigator.geolocation.watchPosition(
 
 function(position){
 
     const lat = position.coords.latitude;
     const lng = position.coords.longitude;
 
-    // 現在地へ移動
-    map.setView([lat,lng],14);
+    // 初回のみ作成
+    if(currentMarker === null){
 
-    // 現在地ピン
-    L.marker(
-        [lat,lng],
-        {icon:redIcon}
-    )
-    .addTo(map)
-    .bindPopup("現在地")
-    .openPopup();
+        currentMarker = L.marker(
+            [lat,lng],
+            {icon:redIcon}
+        )
+        .addTo(map)
+        .bindPopup("現在地");
 
+        map.setView([lat,lng],14);
+
+    }else{
+
+        // 移動
+        currentMarker.setLatLng([lat,lng]);
+
+    }
+
+    // 情報表示
     document.getElementById('info').innerHTML =
     `
     現在地<br>
@@ -125,6 +136,12 @@ function(error){
     document.getElementById('info').innerHTML =
     'GPS取得失敗';
 
+},
+
+{
+    enableHighAccuracy:true,
+    maximumAge:0,
+    timeout:5000
 }
 
 );
@@ -220,4 +237,3 @@ document.getElementById('fileInput')
 
 </body>
 </html>
-
