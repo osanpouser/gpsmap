@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ピン立て地図</title>
+
+<link
+ rel="stylesheet"
+ href="https://unpkg.com/leaflet/dist/leaflet.css"
+/>
+
+<style>
+
+html,body{
+    margin:0;
+    padding:0;
+}
+
+#topbar{
+    width:100%;
+    height:50px;
+    display:flex;
+}
+
+#saveBtn,
+#loadBtn{
+    flex:1;
+    font-size:20px;
+}
+
+#map{
+    height:90vh;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="topbar">
+
+<button id="saveBtn">
+保存
+</button>
+
+<button id="loadBtn">
+読込
+</button>
+
+</div>
+
+<input
+type="file"
+id="fileInput"
+accept=".txt"
+style="display:none"
+>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+
+// 保存用
+const points = [];
+
+// マーカー管理
+const markers = [];
+
+// 地図
+const map = L.map('map').setView([34.665,133.919],13);
+
+// 国土地理院
+L.tileLayer(
+'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
+{
+ attribution:'国土地理院'
+}
+).addTo(map);
+
+
+
+// popup更新
+function updatePopup(index){
+
+    const point = points[index];
+
+    if(point === null){
+        return;
+    }
+
+    const popupText =
+    `
+    ${point.memo || "メモなし"}<br>
+    緯度:${point.lat}<br>
+    経度:${point.lng}
+    `;
+
+    // popup
+    markers[index].bindPopup(popupText);
+
+    // tooltip削除
+    markers[index].unbindTooltip();
+
+    // メモ常時表示
+    if(point.memo){
+
+        markers[index].bindTooltip(
+            point.memo,
+            {
+                permanent:true,
+                direction:'top',
+                offset:[0,-20]
+            }
+        );
+
+    }
+
+}
+
+
+
+// ピン生成関数
+function createMarker(lat,lng,memo=""){
+
+    // データ
+    const point = {
+        lat:lat,
+        lng:lng,
+        memo:memo
+    };
+
+    // 保存
+    points.push(point);
+
+    const index = markers.length;
+
+    // マーカー
+    const marker = L.marker([lat,lng])
+        .addTo(map);
+
+    // 保存
+    markers.push(marker);
+
+    // popup更新
+    updatePopup(index);
+
+    // シングルクリック
+    marker.on('click',function(){
+
+        updatePopup(index);
+
+        marker.openPopup();
+
+    });
+
+    // ダブルクリック編集
+    marker.on('dblclick',function(){
+
+        const newMemo = prompt(
+            "位置情報・メモ入力",
+            point.memo || ""
+        );
+
+        if(newMemo === null){
+            return;
+        }
+
+        point.memo = newMemo;
+
+        updatePopup(index);
+
+        marker.openPopup();
+
+    });
+
+    // 右クリック削除
+    marker.on('contextmenu',function(){
+
+        const result = confirm(
+            "このピンを削除しますか？"
+        );
+
+        if(!result){
+            return;
+        }
+
+        map.removeLayer(marker);
+
+        points[index] = null;
+
+    });
+
+}
+
+
+
+// 地図クリック
+map.on('click',function(e){
+
+    createMarker(
+        e.latlng.lat,
+        e.latlng.lng,
+        ""
+    );
+
+});
+
+
+
+// 保存
+document.getElementById('saveBtn')
+.addEventListener('click',function(){
+
+    const fileName = prompt(
+        "保存ファイル名を入力してください",
+        "points.txt"
+    );
+
+    if(!fileName){
+        return;
+    }
+
+    // null除外
+    const validPoints = points.filter(
+        point => point !== null
+    );
+
+    // テキスト化
+    const text = validPoints.map(point => {
+
+        return `${point.memo},${point.lat},${point.lng}`;
+
+    }).join('\n');
+
+    // Blob
+    const blob = new Blob(
+        [text],
+        {type:'text/plain'}
+    );
+
+    // ダウンロード
+    const a = document.createElement('a');
+
+    a.href = URL.createObjectURL(blob);
+
+    a.download = fileName;
+
+    a.click();
+
+});
+
+
+
+// 読込ボタン
+document.getElementById('loadBtn')
+.addEventListener('click',function(){
+
+    document.getElementById('fileInput').click();
+
+});
+
+
+
+// ファイル読込
+document.getElementById('fileInput')
+.addEventListener('change',function(e){
+
+    const file = e.target.files[0];
+
+    if(!file){
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(event){
+
+        const text = event.target.result;
+
+        const lines = text.split('\n');
+
+        lines.forEach(line => {
+
+            if(!line.trim()){
+                return;
+            }
+
+            const parts = line.split(',');
+
+            // memoにカンマ対策
+            const lng = parseFloat(parts.pop());
+            const lat = parseFloat(parts.pop());
+            const memo = parts.join(',');
+
+            createMarker(lat,lng,memo);
+
+        });
+
+    };
+
+    reader.readAsText(file);
+
+});
+
+</script>
+
+</body>
+</html>
